@@ -1,0 +1,138 @@
+# Import findspark 
+import findspark
+import numpy as np
+import pandas as pd
+import holoviews as hv
+import networkx as nx
+import geoviews as gv
+
+from cartopy import crs as ccrs
+
+import geoviews.tile_sources as gts
+
+gv.extension('bokeh')
+
+
+# Initialize and provide path
+findspark.init("/usr/local/spark")
+
+from IPython.core.interactiveshell import InteractiveShell
+InteractiveShell.ast_node_interactivity = "all"
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import *
+from pyspark.sql.types import *
+
+spark = SparkSession.builder \
+   .master("local") \
+   .appName("MySpark") \
+   .config("spark.executor.memory", "1gb") \
+   .getOrCreate()
+   
+
+    
+df1 = spark.read.format('com.databricks.spark.csv').options(header='true', inferschema='true').load('../Bureau/SOD/TBF110_DECLARATION_DATA_TABLE.csv')
+
+
+ddf = df1.select('RECEIVER_SITE_LOC_ID','SENDER_SITE_LOC_ID','LAT_SENDER','LON_SENDER')
+
+dataframe = pd.read_csv('../Bureau/SOD/TBF110_DECLARATION_DATA_TABLE.csv')
+ddf.show()
+
+
+tt = ddf.rdd.map(lambda p: p['RECEIVER_SITE_LOC_ID']).collect()
+
+ll = ddf.rdd.map(lambda p: p['SENDER_SITE_LOC_ID']).collect()
+
+rr = ddf.rdd.map(lambda p: p['LAT_SENDER']).collect()
+
+ss = ddf.rdd.map(lambda p: p['LON_SENDER']).collect()
+
+
+
+lat = np.array([42.5,43.5,44,48,52])
+lon = np.array([2,3,0,-1,-2])
+
+index = tt[:]
+
+path = ll[:]
+
+
+roro = np.column_stack((dataframe['LAT_SENDER'],dataframe['LON_SENDER'],dataframe['SENDER_SITE_LOC_ID']))
+
+gugu = np.column_stack((dataframe['LAT_RECEIVER'],dataframe['LON_RECEIVER'],dataframe['RECEIVER_SITE_LOC_ID']))
+
+lulu = np.concatenate((roro,gugu),axis=0)
+
+indices = list(set(index)|set(path))
+
+print(list(set(index)|set(path)))
+
+
+def tuples(A):
+    try :return tuple(tuples(a) for a in A)
+    except TypeError: return A
+
+print(roro[0][0])
+
+print(set(tuples(roro)))
+print(set(path))
+
+
+print(set(tuples(gugu)))
+print(set(tuples(lulu)))
+
+abc = set(tuples(lulu))
+
+print(len(abc))
+print(len(indices))
+
+
+cde = np.array(list(abc))
+print(cde)
+
+indices2 = np.array(list(indices))
+
+dfrg=pd.DataFrame(cde, columns=['Latitude', 'Longitude', 'Loc_id']) 
+print (dfrg)
+
+test = gv.Dataset(dataframe, kdims=['RECEIVER_SITE_LOC_ID','LAT_SENDER','LON_SENDER'], crs=ccrs.PlateCarree())
+
+
+
+testpoint = gv.Points(test, ['LAT_SENDER','LON_SENDER'],['SENDER_SITE_LOC_ID','RECEIVER_SITE_LOC_ID'],crs=ccrs.PlateCarree())
+
+#projected = gv.operation.project(testpoint, projection=ccrs.PlateCarree())
+
+#print(projected['Latitude'])
+
+noeuds = gv.Nodes(testpoint, ['LAT_SENDER','LON_SENDER','RECEIVER_SITE_LOC_ID'], crs=ccrs.PlateCarree())
+
+
+nodes = gv.Nodes((dataframe['LAT_SENDER'], dataframe['LON_SENDER'], dataframe['RECEIVER_SITE_LOC_ID']))
+
+
+nodes = gv.Nodes((dfrg['Latitude'], dfrg['Longitude'], dfrg['Loc_id']))
+
+#nodes = gv.Nodes(cde,indices2)
+
+
+#graph = gv.Graph(noeuds, ['SENDER_SITE_LOC_ID', 'RECEIVER_SITE_LOC_ID'])
+
+
+dataframe['RECEIVER_SITE_LOC_ID']
+
+graph = gv.Graph(((dataframe['RECEIVER_SITE_LOC_ID'], dataframe['SENDER_SITE_LOC_ID']), nodes))
+
+
+#print(noeuds['Latitude'])
+#graph = gv.Graph(noeuds, ['SENDER_SITE_LOC_ID', 'RECEIVER_SITE_LOC_ID'], ['SENDER_SITE_LOC_ID', 'RECEIVER_SITE_LOC_ID'], crs=ccrs.PlateCarree())
+#tiles = hv.tile_sources.Wikipedia
+
+
+print(graph['SENDER_SITE_LOC_ID'])
+print(graph.edgepaths['x'])
+#romain = graph.to(gv.Image, ['Latitude','Longitude'])
+
+%opts Graph [width=800 height=600] 
+(gts.Wikipedia * graph)
+#graph
